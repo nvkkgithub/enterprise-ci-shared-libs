@@ -158,7 +158,7 @@ def call(Map inputConfig) {
 				}
 			}
 
-			stage('Upload To Nexus') {
+			stage('Artifactory Publish') {
 				agent {
 					label jenkins_slave
 				}

@@ -1,15 +1,19 @@
 ## Jenkins Shared Libraries
 
-Repository contains pipeline shared libraries that can be hosted onto Enterprise CI platform designed.
+Repository contains pipeline shared libraries that can be hosted onto any Jenkins platform.
 
-* Jenkins CI-Pipeline as service to be consumable by Java and Maven based projects written in groovy template.
+Objective is to ensure common CI-pipeline steps - Checkout, BuildnJunit, SonarChecks, Quality Gates, Artifactory Publish are applied to all the projects in general.
+
+
 
 
 ### Folder Structure 
 
-* vars/MavenBuild_CIpipeline
+#### vars/MavenBuild_CIpipeline
 
-Used for Java projects that are based on maven builds.
+* Jenkins CI-Pipeline as service to be consumable by Java and Maven based projects written in groovy template.
+
+* Used for Java projects that are based on maven builds.
 
 
 ### Versions supported and assumptions
@@ -49,7 +53,8 @@ MavenBuild_CIpipeline(inputConfig)
 
 #### Final: Jenkinsfile
 
-* Finally, Jenkinsfile should look like this.
+* Finally, Jenkinsfile should look like this. In Less than 20 lines (only configurations) - complete CI pipeline will be generated.
+
 ```
 @Library('jenkins-library@master') _
 
