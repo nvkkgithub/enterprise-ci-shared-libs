@@ -5,6 +5,12 @@ def call(Map inputConfig) {
     println prettyPrint(toJson(inputConfig))
 	def jenkins_master = "master"
 	def jenkins_slave = "rhel-jenkins-slave"
+	def skip_dynamic_provision = false
+
+	if(!inputConfig.provisionDynamicAgent) {
+		jenkins_slave = "rhel-static-jenkins-slave"
+		skip_dynamic_provision = true
+	}
 
 	pipeline {
 		agent {
@@ -25,8 +31,10 @@ def call(Map inputConfig) {
       
 		options {
     		timeout(time: 55 , unit: 'MINUTES')
-            buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '5'))
-            office365ConnectorWebhooks([[
+            
+			buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '5'))
+            
+			office365ConnectorWebhooks([[
                 name: env.TEAMS_HOOK_NAME,
                 notifyBackToNormal: true,
                 notifyFailure: true,
@@ -35,9 +43,15 @@ def call(Map inputConfig) {
                 notifyUnstable: true,
                 url: env.TEAMS_HOOK_URL
             ]])
+
     	}      
 		stages {
 			stage('Provision EC2 Agent') {
+				when {
+					expression {
+						return !skip_dynamic_provision
+					}
+				}
 				agent {
 					label jenkins_master
 				}
@@ -54,7 +68,7 @@ def call(Map inputConfig) {
 							submoduleCfg: [], 
 							userRemoteConfigs: [[
 							credentialsId: "git-user-id", 
-							url: "git@github.com:nvkkgithub/enterprise-ci-terraform.git"]]])
+							url: "git@github.com:nvkkgithub/enterprise-ci-iac.git"]]])
 						
 						withCredentials([[
 							$class: 'AmazonWebServicesCredentialsBinding', 
@@ -62,8 +76,7 @@ def call(Map inputConfig) {
 							credentialsId: 'terraform-provioner-id', 
 							secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
 							]]) {
-								sh 'cd 03-Ec2 && terraform init && ls'
-								sh 'cd 03-Ec2 && terraform apply --var-file=jenkins-slave/terraform.tfvars --auto-approve'
+								sh 'make jenkins-slave/create'
 						}
 
 					}
@@ -113,7 +126,15 @@ def call(Map inputConfig) {
 					script {
 						script {
 							print '******************** Publish Sonar ************************************'
-							sh inputConfig.app_sonar_publish_cmd
+							withCredentials(
+								[[
+									$class: 'UsernamePasswordMultiBinding', 
+									credentialsId: 'sonar7-publish-cred',
+									usernameVariable: 'sonarlogin', passwordVariable: 'sonarpassword']]) {
+								
+								sh inputConfig.app_sonar_publish_cmd + ' -Dsonar.login=${sonarlogin} -Dsonar.password=${sonarpassword}'
+							}
+							
 						}
 					}
 
@@ -149,6 +170,11 @@ def call(Map inputConfig) {
 			}
 
 			stage('Destroy EC2 Agent') {
+				when {
+					expression {
+						return !skip_dynamic_provision
+					}
+				}
 				agent {
 					label jenkins_master
 				}
@@ -162,9 +188,7 @@ def call(Map inputConfig) {
 							credentialsId: 'terraform-provioner-id', 
 							secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
 							]]) {
-								sh 'pwd'
-								sh 'cd 03-Ec2 && ls'
-								sh 'cd 03-Ec2 && terraform destroy --var-file=jenkins-slave/terraform.tfvars --auto-approve'
+								sh 'make jenkins-slave/destroy'
 						}
 					}
 				}
@@ -176,7 +200,9 @@ def call(Map inputConfig) {
 				script {
 					print '********** Post scrips *******************'
 					//cleanWs()
+					logstashSend failBuild: true, maxLines: 99999
 					try{
+						print 'Cleaning up offline nodes'
 						for (aSlave in hudson.model.Hudson.instance.slaves) {
                             if (aSlave.getComputer() != null && aSlave.getComputer().isOffline()) {
                                 aSlave.getComputer().setTemporarilyOffline(true,null);
@@ -185,7 +211,7 @@ def call(Map inputConfig) {
                             }
                         }
 					} catch(e) {
-						echo e.toString()  
+						print e.toString()  
 					}
 				}
 			}
