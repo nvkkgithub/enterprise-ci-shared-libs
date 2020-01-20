@@ -7,7 +7,7 @@ def call(Map inputConfig) {
 	def jenkins_slave = "rhel-jenkins-slave"
 	def skip_dynamic_provision = false
 
-	if(!inputConfig.provisionDynamicAgent) {
+	if(inputConfig.provisionDynamicAgent != null && !inputConfig.provisionDynamicAgent) {
 		jenkins_slave = "rhel-static-jenkins-slave"
 		skip_dynamic_provision = true
 	}
@@ -76,7 +76,7 @@ def call(Map inputConfig) {
 							credentialsId: 'terraform-provioner-id', 
 							secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
 							]]) {
-								sh 'make jenkins-slave/create'
+							sh 'cd terraform/03-Ec2 && /usr/local/bin/terraform init && /usr/local/bin/terraform apply --var-file=jenkins-slave/terraform.tfvars --auto-approve'
 						}
 
 					}
@@ -188,7 +188,7 @@ def call(Map inputConfig) {
 							credentialsId: 'terraform-provioner-id', 
 							secretKeyVariable: 'AWS_SECRET_ACCESS_KEY'
 							]]) {
-								sh 'make jenkins-slave/destroy'
+								sh 'cd terraform/03-Ec2 && /usr/local/bin/terraform init && /usr/local/bin/terraform destroy --var-file=jenkins-slave/terraform.tfvars --auto-approve'
 						}
 					}
 				}
